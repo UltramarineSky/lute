@@ -1439,8 +1439,14 @@ func (lute *Lute) genASTByDOM(n *html.Node, tree *parse.Tree) {
 		tree.Context.Tip = node
 		defer tree.Context.ParentTip()
 	case atom.U:
-		node.Type = ast.NodeHTMLTag
-		node.AppendChild(&ast.Node{Type: ast.NodeHTMLTagOpen, Tokens: util.StrToBytes("<u>")})
+		if lute.ParseOptions.ProtyleWYSIWYG {
+			// 使用原生下划线节点，使嵌套文本的样式属性参与平铺转换。
+			node.Type = ast.NodeUnderline
+			node.AppendChild(&ast.Node{Type: ast.NodeUnderlineOpenMarker})
+		} else {
+			node.Type = ast.NodeHTMLTag
+			node.AppendChild(&ast.Node{Type: ast.NodeHTMLTagOpen, Tokens: util.StrToBytes("<u>")})
+		}
 		tree.Context.Tip.AppendChild(node)
 		tree.Context.Tip = node
 		defer tree.Context.ParentTip()
@@ -2068,7 +2074,11 @@ func (lute *Lute) genASTByDOM(n *html.Node, tree *parse.Tree) {
 		}
 		appendSpace(n, tree, lute)
 	case atom.U:
-		node.AppendChild(&ast.Node{Type: ast.NodeHTMLTagClose, Tokens: util.StrToBytes("</u>")})
+		if node.Type == ast.NodeUnderline {
+			node.AppendChild(&ast.Node{Type: ast.NodeUnderlineCloseMarker})
+		} else {
+			node.AppendChild(&ast.Node{Type: ast.NodeHTMLTagClose, Tokens: util.StrToBytes("</u>")})
+		}
 	case atom.Mark:
 		if !lute.ParseOptions.Mark && !lute.ParseOptions.HTMLTag2TextMark {
 			node.AppendChild(&ast.Node{Type: ast.NodeHTMLTagClose, Tokens: util.StrToBytes("</mark>")})

@@ -53,3 +53,19 @@ func TestHTMLStyleDeclarations(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestHTMLBackgroundShorthand(t *testing.T) {
+	for _, tc := range []struct{ css, expected string }{
+		{"background-color:red;background:blue", "blue"},
+		{"background:blue;background-color:red", "red"},
+		{"background:blue!important;background-color:red", "blue"},
+		{"background-color:red!important;background:blue", "red"},
+		{"background:rgb(255,165,61)", "rgb(255,165,61)"},
+		{"background:url(https://example.com/image.png)", ""},
+	} {
+		got := ResolveHTMLTextStyle(&html.Node{Attr: []*html.Attribute{{Key: "style", Val: tc.css}}}, HTMLTextStyle{})
+		if got.Background != tc.expected {
+			t.Errorf("%s: got %q, want %q", tc.css, got.Background, tc.expected)
+		}
+	}
+}

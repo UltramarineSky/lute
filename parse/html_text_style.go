@@ -77,6 +77,10 @@ func HTMLStyleDeclarations(style string) map[string]string {
 		if idx := strings.LastIndex(value, "!"); idx >= 0 && strings.EqualFold(strings.TrimSpace(value[idx+1:]), "important") {
 			priority, value = true, strings.TrimSpace(value[:idx])
 		}
+		// WPS 使用纯色 background 简写；转换为背景色后仍按声明顺序及优先级处理。
+		if key == "background" && htmlTextColor.MatchString(value) {
+			key = "background-color"
+		}
 		if !important[key] || priority {
 			ret[key], important[key] = value, priority
 		}
