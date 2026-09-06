@@ -22,6 +22,9 @@ func (t *Tree) parseInlines() {
 	if t.Context.ParseOption.KramdownSpanIAL {
 		t.parseKramdownSpanIAL()
 	}
+	if t.Context.ParseOption.ProtyleWYSIWYG {
+		NormalizeInlineHTMLTextStyles(t)
+	}
 }
 
 // walkParseInline 解析生成节点 node 的行级子节点。

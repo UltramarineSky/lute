@@ -89,6 +89,22 @@ func (lute *Lute) HTMLNode2Tree(n *html.Node) (ret *parse.Tree) {
 		unlink.Unlink()
 		previousLis[i].AppendChild(unlink)
 	}
+	styled := false
+	ast.Walk(ret.Root, func(node *ast.Node, entering bool) ast.WalkStatus {
+		if entering && (node.Type == ast.NodeTextMark || node.Type == ast.NodeCodeSpan) && node.IALAttr("style") != "" {
+			styled = true
+		}
+		return ast.WalkContinue
+	})
+	if styled {
+		parse.NestedInlines2FlattedSpansHybrid(ret, false)
+		ast.Walk(ret.Root, func(node *ast.Node, entering bool) ast.WalkStatus {
+			if entering && node.Type == ast.NodeTextMark {
+				parse.ApplyHTMLTextStyle(node, node.IALAttr("style"))
+			}
+			return ast.WalkContinue
+		})
+	}
 	return ret
 }
 
@@ -460,6 +476,24 @@ func (lute *Lute) genASTByDOM(n *html.Node, tree *parse.Tree) {
 	}
 
 	node := &ast.Node{Type: ast.NodeText, Tokens: util.StrToBytes(n.Data)}
+	textStyle := ""
+	if lute.ParseOptions.ProtyleWYSIWYG {
+		textStyle = parse.HTMLNodeTextStyle(n).CSS()
+		defer func() {
+			if node.Parent == nil || textStyle == "" {
+				return
+			}
+			if node.Type == ast.NodeCodeSpan {
+				node.SetIALAttr("style", textStyle)
+				node.InsertAfter(&ast.Node{Type: ast.NodeKramdownSpanIAL, Tokens: parse.IAL2Tokens(node.KramdownIAL)})
+			} else {
+				parse.ApplyHTMLTextStyle(node, textStyle)
+				if node.Type == ast.NodeTextMark {
+					parse.ApplyHTMLTextSemantics(node, n)
+				}
+			}
+		}()
+	}
 	withIAL := false
 	withDOMIAL := false
 	if atom.Table == n.DataAtom {
@@ -557,7 +591,7 @@ func (lute *Lute) genASTByDOM(n *html.Node, tree *parse.Tree) {
 			return
 		}
 
-		if nil != n.Parent && atom.Span == n.Parent.DataAtom && 0 == len(n.Parent.Attr) {
+		if textStyle != "" || (nil != n.Parent && atom.Span == n.Parent.DataAtom && 0 == len(n.Parent.Attr)) {
 			// 按原文解析，不处理转义
 		} else {
 			if lute.ParseOptions.ProtyleWYSIWYG {
@@ -1564,7 +1598,7 @@ func (lute *Lute) genASTByDOM(n *html.Node, tree *parse.Tree) {
 		defer tree.Context.ParentTip()
 	case atom.Colgroup, atom.Col:
 		return
-	case atom.Span:
+	case atom.Span, atom.Small:
 		class := util.DomAttrValue(n, "class")
 		if "fn__space5" == class {
 			return
@@ -1803,7 +1837,7 @@ func (lute *Lute) genASTByDOM(n *html.Node, tree *parse.Tree) {
 		}
 
 		style := util.DomAttrValue(n, "style")
-		if strings.Contains(style, "underline") {
+		if textStyle == "" && strings.Contains(style, "underline") {
 			text := util.DomText(n)
 			if "" == text {
 				break
@@ -1823,7 +1857,7 @@ func (lute *Lute) genASTByDOM(n *html.Node, tree *parse.Tree) {
 			}
 		}
 
-		if strings.Contains(style, "bold") {
+		if textStyle == "" && strings.Contains(style, "bold") {
 			text := util.DomText(n)
 			if "" == text {
 				break
@@ -1861,6 +1895,12 @@ func (lute *Lute) genASTByDOM(n *html.Node, tree *parse.Tree) {
 		tree.Context.Tip.AppendChild(kbd)
 		return
 	case atom.Font:
+		if lute.ParseOptions.ProtyleWYSIWYG {
+			for c := n.FirstChild; c != nil; c = c.NextSibling {
+				lute.genASTByDOM(c, tree)
+			}
+			return
+		}
 		node.Type = ast.NodeText
 		tokens := []byte(util.DomText(n))
 		for strings.Contains(string(tokens), "\n\n") {

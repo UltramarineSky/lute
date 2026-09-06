@@ -425,7 +425,24 @@ func processNestedNode(n *ast.Node, tag string, tags *[]string, unlinks *[]*ast.
 			next := c.Next
 			if ast.NodeTextMark == c.Type || ast.NodeText == c.Type || ast.NodeImage == c.Type {
 				n.InsertBefore(c)
-				c.KramdownIAL = n.KramdownIAL
+				if c.IALAttr("style") == "" {
+					c.KramdownIAL = n.KramdownIAL
+				} else {
+					// 平铺嵌套格式时保留文本自身的样式，并补齐祖先上的其他属性。
+					for _, attr := range n.KramdownIAL {
+						if c.IALAttr(attr[0]) == "" {
+							c.SetIALAttr(attr[0], attr[1])
+						}
+					}
+				}
+				if n.Type == ast.NodeLink && c.Type == ast.NodeTextMark {
+					if dest := n.ChildByType(ast.NodeLinkDest); dest != nil {
+						c.TextMarkAHref = dest.TokensStr()
+					}
+					if title := n.ChildByType(ast.NodeLinkTitle); title != nil {
+						c.TextMarkATitle = title.TokensStr()
+					}
+				}
 			} else if ast.NodeLinkDest == c.Type {
 				if nil != n.Previous && ast.NodeTextMark == n.Previous.Type {
 					n.Previous.TextMarkAHref = string(c.Tokens)
