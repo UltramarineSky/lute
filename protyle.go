@@ -2447,10 +2447,10 @@ func (lute *Lute) genASTContenteditable(n *html.Node, tree *parse.Tree) {
 
 func (lute *Lute) setBlockIAL(n *html.Node, node *ast.Node) (ialTokens []byte) {
 	node.SetIALAttr("id", node.ID)
-	for _, name := range []string{"tabs-active-id", "tabs-position", "tabs-title", "tabs-placeholder"} {
+	for _, name := range []string{"tabs-active-id", "tabs-position", "tabs-title", "tabs-placeholder", "tabs-task"} {
 		if value := util.DomAttrValue(n, name); "" != value {
 			node.SetIALAttr(name, value)
-			ialTokens = append(ialTokens, []byte(" "+name+"=\""+value+"\"")...)
+			ialTokens = append(ialTokens, []byte(" "+name+"=\""+html.EscapeAttrVal(value)+"\"")...)
 		}
 	}
 

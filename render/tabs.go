@@ -7,6 +7,7 @@ import (
 
 	"github.com/88250/lute/ast"
 	"github.com/88250/lute/editor"
+	"github.com/88250/lute/html"
 	"github.com/88250/lute/parse"
 )
 
@@ -38,6 +39,9 @@ func (r *FormatRenderer) renderTabs(node *ast.Node, entering bool) ast.WalkStatu
 		} else if nil != node.Next && ast.NodeKramdownBlockIAL == node.Next.Type {
 			r.Write(node.Next.Tokens)
 		}
+		r.Newline()
+	} else if marker := node.IALAttr("tabs-task"); "" != marker {
+		r.Write(parse.IAL2Tokens([][]string{{"tabs-task", html.EscapeAttrVal(marker)}}))
 		r.Newline()
 	}
 	r.WriteByte('\n')
@@ -154,6 +158,10 @@ func (r *ProtyleExportMdRenderer) renderTabs(node *ast.Node, entering bool) ast.
 			if "" != text {
 				r.WriteString(" " + strings.ReplaceAll(strings.ReplaceAll(text, "\r", " "), "\n", " "))
 			}
+			if marker := node.IALAttr("tabs-task"); "" != marker {
+				r.Newline()
+				r.Write(parse.IAL2Tokens([][]string{{"tabs-task", html.EscapeAttrVal(marker)}}))
+			}
 			r.WriteString("\n\n")
 		}
 		return ast.WalkContinue
@@ -210,9 +218,9 @@ func (r *BaseRenderer) renderTabsHTML(node *ast.Node, entering bool) ast.WalkSta
 		if "" != node.ID {
 			attrs = append(attrs, []string{"data-node-id", node.ID}, []string{"id", node.ID})
 		}
-		for _, name := range []string{"tabs-active-id", "tabs-position"} {
+		for _, name := range []string{"tabs-active-id", "tabs-position", "tabs-task"} {
 			if value := node.IALAttr(name); "" != value {
-				attrs = append(attrs, []string{name, value})
+				attrs = append(attrs, []string{name, html.EscapeAttrVal(value)})
 			}
 		}
 		r.Tag("div", attrs, false)

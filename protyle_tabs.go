@@ -40,7 +40,7 @@ func (lute *Lute) genASTByTabsDOM(dom *html.Node, tree *parse.Tree) bool {
 			}
 		}
 	}
-	for _, name := range []string{"tabs-active-id", "tabs-position"} {
+	for _, name := range []string{"tabs-active-id", "tabs-position", "tabs-task"} {
 		if value := util.DomAttrValue(dom, name); "" != value {
 			node.SetIALAttr(name, value)
 		}
