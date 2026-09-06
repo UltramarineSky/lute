@@ -68,6 +68,48 @@ func TestHTMLTextStyleRoundTrip(t *testing.T) {
 	}
 }
 
+func TestHTMLQuotedFontFamilyRoundTrip(t *testing.T) {
+	engine := lute.New()
+	engine.SetHeadingID(false)
+	engine.SetProtyleWYSIWYG(true)
+	engine.SetHTMLTag2TextMark(true)
+	engine.SetKramdownIAL(true)
+	engine.SetAutoSpace(false)
+	for _, input := range []string{
+		`<p style='color:red;font-family:"Mona Sans VF", "Segoe UI", Arial;font-size:14px'>before <strong>bold</strong> after</p>`,
+		`<h2 style="color:red;font-family:&quot;Mona Sans VF&quot;, &quot;Segoe UI&quot;, Arial;font-size:14px">before <strong>bold</strong> after</h2>`,
+		`<table><tr><td style='color:red;font-family:"Mona Sans VF", "Segoe UI", Arial;font-size:14px'>before <strong>bold</strong> after</td></tr></table>`,
+	} {
+		dom := engine.HTML2BlockDOM(input)
+		for i := 0; i < 3; i++ {
+			if strings.Contains(dom, "{: style=") {
+				t.Fatalf("round %d leaked attributes: %s", i, dom)
+			}
+			tree := engine.BlockDOM2Tree(dom)
+			styled := 0
+			ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
+				if entering && n.Type == ast.NodeTextMark {
+					styled++
+					style := n.IALAttr("style")
+					for _, want := range []string{`font-family: "Mona Sans VF", "Segoe UI", Arial;`, "color: red;", "font-size: 14.000000px;"} {
+						if !strings.Contains(style, want) {
+							t.Errorf("round %d lost %q: %s", i, want, dom)
+						}
+					}
+					if n.TextMarkTextContent == "bold" && !n.ContainTextMarkTypes("strong") {
+						t.Errorf("bold was lost: %s", dom)
+					}
+				}
+				return ast.WalkContinue
+			})
+			if styled < 3 {
+				t.Fatalf("text fragments were lost: %s", dom)
+			}
+			dom = engine.SpinBlockDOM(dom)
+		}
+	}
+}
+
 func TestMarkdownHTMLStyleBoundaries(t *testing.T) {
 	engine := lute.New()
 	for _, input := range []string{"`<small>x</small>`", "```html\n<small>x</small>\n```", `before <small>unclosed`} {

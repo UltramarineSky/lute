@@ -214,16 +214,17 @@ func (t *Tree) parseKramdownSpanIAL() {
 		}
 
 		if nil != n.Previous && ast.NodeKramdownSpanIAL == n.Previous.Type && ast.NodeText == n.Type && nil != n.Previous.Previous {
-			tokens := n.Tokens
+			tokens, end := spanIALText(n)
 			if pos, ial := t.Context.parseKramdownSpanIAL(tokens); 0 < len(ial) {
 				same := true
 				for _, kv := range ial {
-					if n.Previous.Previous.IALAttr(kv[0]) != kv[1] {
+					if n.Previous.Previous.IALAttr(kv[0]) != html.UnescapeAttrVal(kv[1]) {
 						same = false
 						break
 					}
 				}
 				if same {
+					mergeSpanIALText(n, end)
 					n.Tokens = tokens[pos+1:]
 				}
 			}
@@ -241,9 +242,10 @@ func (t *Tree) parseKramdownSpanIAL() {
 			return ast.WalkContinue
 		}
 
-		tokens := n.Next.Tokens
+		tokens, end := spanIALText(n.Next)
 		if pos, ial := t.Context.parseKramdownSpanIAL(tokens); 0 < len(ial) {
 			n.KramdownIAL = ial
+			mergeSpanIALText(n.Next, end)
 			n.Next.Tokens = tokens[pos+1:]
 			if 1 > len(n.Next.Tokens) {
 				n.Next.Unlink() // 移掉空的文本节点 {: ial}
@@ -254,6 +256,41 @@ func (t *Tree) parseKramdownSpanIAL() {
 		return ast.WalkContinue
 	})
 	return
+}
+
+// spanIALText 收集被 HTML 实体分开的属性源码，保留实体编码，避免引号提前结束属性值。
+func spanIALText(start *ast.Node) (tokens []byte, end *ast.Node) {
+	tokens, end = start.Tokens, start
+	if !bytes.HasPrefix(tokens, []byte("{:")) || bytes.Contains(tokens, closeCurlyBrace) {
+		return
+	}
+	var buffer bytes.Buffer
+	buffer.Write(tokens)
+	for next := start.Next; next != nil; next = next.Next {
+		switch next.Type {
+		case ast.NodeText:
+			buffer.Write(next.Tokens)
+		case ast.NodeHTMLEntity:
+			buffer.Write(next.HtmlEntityTokens)
+		default:
+			return start.Tokens, start
+		}
+		if next.Type == ast.NodeText && bytes.Contains(next.Tokens, closeCurlyBrace) {
+			return buffer.Bytes(), next
+		}
+	}
+	return start.Tokens, start
+}
+
+// mergeSpanIALText 仅在属性解析成功后移除已消费的兄弟节点，未闭合属性保持原样。
+func mergeSpanIALText(start, end *ast.Node) {
+	for start != end && start.Next != nil {
+		next := start.Next
+		next.Unlink()
+		if next == end {
+			return
+		}
+	}
 }
 
 func (context *Context) parseKramdownBlockIAL(tokens []byte) (ret [][]string) {
